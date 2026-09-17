@@ -1,5 +1,5 @@
 import pyzed.sl as sl
-import time
+import time as time
 
 print("Starting ZED X Mini...")
 
@@ -7,14 +7,14 @@ zed = sl.Camera()
 
 status = zed.open()
 
-if status != s1.ERROR_CODE.SUCCESS:
+if status != sl.ERROR_CODE.SUCCESS:
     print("Failed to opne ZED camera.")
     exit(1)
 
 print("ZED camera opened successfully!")
 
 
-recording_params = s1.RecordingParameters(
+recording_params = sl.RecordingParameters(
     "recording.svo",
     sl.SVO_COMPRESSION_MODE.H264
 )
@@ -32,7 +32,7 @@ print("Recording for 10 seconds...")
 # Record for 10 seconds 
 start_time = time.time()
 
-whlie time.time() - start_time < 10:
+while time.time() - start_time < 10:
     if zed.grab() == sl.ERROR_CODE.SUCCESS:
         pass
 
