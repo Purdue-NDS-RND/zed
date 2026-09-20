@@ -1,8 +1,11 @@
+#!/bin/bash
 
-echo "ZED X MINI Recorder"
+# Navigate to the directory containing this script
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR" || exit 1
 
-echo "Starting the camera and recording"
+echo "========================================"
+echo "         ZED X MINI Recorder            "
+echo "========================================"
 
-uv run video_capture.py
-
-echo "recording has finished"
+uv run video_capture.py "$@"
