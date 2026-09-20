@@ -55,7 +55,7 @@ def main():
         # Configure recording
         recording_params = sl.RecordingParameters(
             filename,
-            sl.SVO_COMPRESSION_MODE.H264
+            sl.SVO_COMPRESSION_MODE.LOSSLESS
         )
 
         # Start recording
