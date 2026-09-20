@@ -7,17 +7,19 @@ zed = sl.Camera()
 
 status = zed.open()
 
-if status != s1.ERROR_CODE.SUCCESS:
-    print("Failed to opne ZED camera.")
+if status != sl.ERROR_CODE.SUCCESS:
+    print("Failed to open ZED camera.")
     exit(1)
 
 print("ZED camera opened successfully!")
 
+filename = time.strftime("recording_%Y%m%d_%H%M%S.svo")
 
-recording_params = s1.RecordingParameters(
-    "recording.svo",
+recording_params = sl.RecordingParameters(
+    filename,
     sl.SVO_COMPRESSION_MODE.H264
 )
+
 
 status = zed.enable_recording(recording_params)
 
@@ -26,23 +28,23 @@ if status != sl.ERROR_CODE.SUCCESS:
     zed.close()
     exit(1)
 
-print("Recording started")
-print("Recording for 10 seconds...")
+print("Recording started.")
+print("Recording continuously.")
+print("Press Ctrl+C to stop recording.")
 
-# Record for 10 seconds 
-start_time = time.time()
+try:
+    while True:
+        if zed.grab() == sl.ERROR_CODE.SUCCESS:
+            pass
 
-whlie time.time() - start_time < 10:
-    if zed.grab() == sl.ERROR_CODE.SUCCESS:
-        pass
+except KeyboardInterrupt:
+    print("\nStopping recording...")
 
+finally:
+    zed.disable_recording()
+    print("Recording finished!")
 
-# Stop recording 
-zed.disable_recording()
+    zed.close()
+    print("ZED X Mini closed.")
+    print(f"Saved recording to {filename}")
 
-print("Recording finished!")
-
-zed.close()
-
-print("ZED X Mini closed.")
-print("Saved recording to recording.svo")
