@@ -1,0 +1,85 @@
+ZED X – Camera stream suddenly fails to start + ROI Calibration tool not working: https://community.stereolabs.com/t/zed-x-camera-stream-suddenly-fails-to-start-roi-calibration-tool-not-working/10380/11
+
+ZED Calibration: https://docs.stereolabs.com/docs/development/zed-tools/zed-calibration
+
+NVIDIA ISP Guide: https://docs.stereolabs.com/docs/products/cameras/zedx/isp-guide
+
+Camera Controls: https://docs.stereolabs.com/docs/development/zed-sdk/modules/camera/camera-controls
+Python Camera Controls: https://github.com/stereolabs/zed-sdk/blob/master/camera%20control/python/camera_control.py
+----------------------------------------------------------------------------------------------------------------------------------------------------------
+ChatGPT Suggestion:
+Fastest way to test it
+Before touching ROS, I would use Stereolabs’ official Camera Control sample. Their Python sample lets you:
+1. Open the live camera view.
+2. Drag a rectangle with the mouse around the region you want exposure to care about.
+3. Press a to apply that rectangle as the AEC_AGC_ROI.
+4. Press f to return the exposure ROI to the full image. GitHub
+The actual SDK call used by their Python sample is:
+
+cam.set_camera_settings_roi(
+    sl.VIDEO_SETTINGS.AEC_AGC_ROI,
+    selection_rect,
+    sl.SIDE.BOTH
+)
+--
+Programmatically, that would look roughly like:
+import pyzed.sl as sl
+
+zed = sl.Camera()
+
+init = sl.InitParameters()
+status = zed.open(init)
+
+if status != sl.ERROR_CODE.SUCCESS:
+    print(status)
+    exit(1)
+
+info = zed.get_camera_information()
+res = info.camera_configuration.resolution
+
+x = int(0.10 * res.width)
+y = int(0.30 * res.height)
+w = int(0.80 * res.width)
+h = int(0.60 * res.height)
+
+roi = sl.Rect(x, y, w, h)
+
+err = zed.set_camera_settings_roi(
+    sl.VIDEO_SETTINGS.AEC_AGC_ROI,
+    roi,
+    sl.SIDE.BOTH
+)
+
+print(err)
+-------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+Suggestions from Google AI Overview:
+The behavior you are describing is usually caused by extreme overexposure on bright, sunny days, which causes the ZED SDK's automatic self-calibration process to fail.
+By default, every time the camera opens, the ZED SDK executes an on-the-fly self-calibration to adjust the stereo rectification. On a very bright day, the sun glares or overexposes the image sensors so intensely that the feature-matching algorithm cannot identify visual landmarks or keypoints in the frame. Because it can neither see the environment nor load a reliable initial visual frame, the initialization loop breaks, resulting in an "Auto Calibration Fail" or a generic "Camera Fails to Open / Camera Open: FAILURE" error.
+1. Adjust Camera Init Parameters in Code
+Before opening the camera stream, you need to explicitly adjust the manual exposure or gain settings in your InitParameters. This forces the camera to open with lower exposure rather than relying on the auto-exposure loop that gets immediately blinded by sunlight.
+python
+import pyzed.sl as sl
+
+init_params = sl.InitParameters()
+# Disable automatic self-calibration on startup if it continues to fail
+init_params.camera_disable_self_calibration = True 
+
+cam = sl.Camera()
+if cam.open(init_params) == sl.ERROR_CODE.SUCCESS:
+    # Once open, immediately clamp down the exposure and gain manually
+    runtime_params = sl.RuntimeParameters()
+    cam.set_camera_settings(sl.CAMERA_SETTINGS.EXPOSURE, 20) # Lower value for bright days
+    cam.set_camera_settings(sl.CAMERA_SETTINGS.GAIN, 10)
+Use code with caution.
+(Note: If you disable startup self-calibration, make sure the camera isn't subjected to heavy physical impacts or extreme thermal swings, as it will strictly rely on factory baseline settings.)
+2. Apply a Neutral Density (ND) Filter
+The most robust hardware fix for utilizing the ZED X Mini outdoors is a physical Neutral Density (ND) filter or a Polarizing filter.
+• Why it helps: The ZED X Mini has fixed aperture lenses. On a cloudless day, software-based shutter adjustments alone sometimes cannot reduce the photon volume enough to prevent sensor clipping. An ND filter acts like sunglasses for your camera, lowering the intensity of incoming light across all wavelengths so the software auto-exposure can function inside its normal operational envelope.
+3. Clear and Reset the Daemon State
+A failed initialization can leave the GMSL2 daemon in a corrupted state, locking out subsequent open requests even if you move the camera into the shade. If the camera is stuck on "Opening..." or crashing, restart the background services in your terminal:
+bash
+sudo systemctl restart zed_x_daemon
+Use code with caution.
+If you are using a ZED Box Mini, ensure that your driver environment and patched libraries haven't been modified or overwritten by system package updates.
