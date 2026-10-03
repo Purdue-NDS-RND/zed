@@ -1,0 +1,7 @@
+Connecting ZED to JETSON Instructions:
+1. Make sure nothing is connected to power
+2. Connect the Mono to the Jetson via the MIPI cable (Type B 22-pin, aka the blue stickers are on opposite sides of the cable)
+3. Make sure that the blue side is facing up at the Jetson port and the Mono port (The cable should twist once)
+4. Connect the mono to the ZED via the round cable
+5. Connect battery power to the mono
+6. Connect power to the Jetson and power on
