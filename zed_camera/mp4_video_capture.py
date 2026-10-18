@@ -31,12 +31,13 @@ def main():
     zed = sl.Camera()
 
     filename = time.strftime(
-        "recording_%Y%m%d_%H%M%S.svo2"
+        "recording_%Y%m%d_%H%M%S.mp4"
     )
 
     camera_opened = False
     recording_started = False
     recording_finalized = False
+    video = None
 
     frames_recorded = 0
     consecutive_failures = 0
@@ -60,17 +61,26 @@ def main():
 
         print("ZED camera opened successfully!")
 
-        # Configure recording
-        recording_params = sl.RecordingParameters(
+        # Configure MP4 recording
+        left_image = sl.Mat()
+        right_image = sl.Mat()
+
+        resolution = zed.get_camera_information().camera_configuration.resolution
+
+        width = resolution.width
+        height = resolution.height
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+
+        video = cv2.VideoWriter(
             filename,
-            sl.SVO_COMPRESSION_MODE.H264
+            fourcc,
+            30,
+            (width * 2, height)
         )
 
-        # Start recording
-        status = zed.enable_recording(recording_params)
-
-        if status != sl.ERROR_CODE.SUCCESS:
-            print(f"Failed to start recording: {status}")
+        if not video.isOpened():
+            print("Failed to start MP4 recording.")
             return 1
 
         recording_started = True
@@ -85,6 +95,23 @@ def main():
             status = zed.grab()
 
             if status == sl.ERROR_CODE.SUCCESS:
+                zed.retrieve_image(left_image, sl.VIEW.LEFT)
+                zed.retrieve_image(right_image, sl.VIEW.RIGHT)
+
+                left_frame = cv2.cvtColor(
+                    left_image.get_data(),
+                    cv2.COLOR_BGRA2BGR
+                )
+
+                right_frame = cv2.cvtColor(
+                    right_image.get_data(),
+                    cv2.COLOR_BGRA2BGR
+                )
+
+                stereo_frame = np.hstack((left_frame, right_frame))
+
+                video.write(stereo_frame)
+
                 frames_recorded += 1
                 consecutive_failures = 0
 
@@ -112,13 +139,13 @@ def main():
 
     finally:
 
-        # Finalize the SVO2 before closing the camera.
-        if recording_started:
+        # Finalize the MP4 before closing the camera.
+        if video is not None:
 
-            print("\nFinalizing SVO2 recording...")
+            print("\nFinalizing MP4 recording...")
 
             try:
-                zed.disable_recording()
+                video.release()
 
                 recording_finalized = True
 
