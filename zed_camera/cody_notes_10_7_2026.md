@@ -1,0 +1,1 @@
+Prompted claude to disable auto calibration so we can input hard numbers to control camera exposure. Also made sure the video outputs to mp4 and not svo. What we could do for the next time is to check for framerate of the video and also ideal exposure brightness.
