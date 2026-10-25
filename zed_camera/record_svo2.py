@@ -29,7 +29,7 @@ def parse_args():
                         help='Opt in to the startup adjustment; skipped by default.')
     parser.add_argument('--max-consecutive-errors', type=int, default=30)
     parser.add_argument('--write-stall-timeout', type=float, default=15,
-                        help='Stop if the encoded-frame counter stalls this many seconds.')
+                        help='Stop after this many seconds of unsuccessful recording status.')
     if (args := parser.parse_args()).duration < 0:
         parser.error('--duration must be nonnegative')
     if args.fps <= 0 or args.max_consecutive_errors <= 0:
@@ -94,8 +94,7 @@ def main():
         started = time.monotonic()
         last_report = started
         last_warning = None
-        last_encoded = 0
-        last_write_progress = started
+        write_failure_since = None
         last_write_warning = float('-inf')
 
         while not stop_requested:
@@ -128,18 +127,22 @@ def main():
             details = (f'is_recording={recording.is_recording}, '
                        f'frame_status={recording.status}, '
                        f'ingested={ingested}, encoded={encoded}')
-            if encoded > last_encoded:
-                last_write_progress = now
-                last_encoded = encoded
-            # One frame-status sample is not a sustained recorder failure.
-            # Encoding/writing can lag behind frame ingestion.
-            if not recording.is_recording or not recording.status:
+            # Counters can remain zero even for a playable SVO2 on the user's
+            # SDK/platform. Log them, but do not use them as a failure signal.
+            # Only sustained unsuccessful recording status triggers shutdown.
+            write_ok = recording.is_recording and recording.status
+            if write_ok:
+                write_failure_since = None
+            else:
+                if write_failure_since is None:
+                    write_failure_since = now
                 if now - last_write_warning >= 5:
                     print(f'Recording status warning: {details}', flush=True)
                     last_write_warning = now
-            if now - last_write_progress >= args.write_stall_timeout:
+            if (write_failure_since is not None
+                    and now - write_failure_since >= args.write_stall_timeout):
                 raise RuntimeError(
-                    f'No encoded-frame progress for {args.write_stall_timeout:g}s; '
+                    f'Unsuccessful recording status for {args.write_stall_timeout:g}s; '
                     f'{details}. Check free disk space, SDK logs, and output storage.')
             if now - last_report >= 5:
                 print(f'Elapsed: {now - started:.1f}s; '
