@@ -1,6 +1,67 @@
+#!/usr/bin/env python3
+"""Record ZED X Mini stereo video without scene-dependent self-calibration.
 
-    
-  
+Run with the Jetson's installed ZED SDK and matching pyzed Python environment.
+Defaults: serial 55206385, SVGA, 15 FPS, lossless SVO2, no live depth.
+Ctrl+C or SIGTERM finalizes the recording. Duration 0 records until stopped.
+Disabling self-calibration preserves factory calibration; it cannot bypass
+hardware, driver, CUDA, or missing calibration-file errors.
+"""
+
+import argparse
+from datetime import datetime
+from pathlib import Path
+import signal
+import sys
+import time
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--serial', type=int, default=55206385)
+    parser.add_argument('--resolution', choices=['SVGA', 'HD1080', 'HD1200'],
+                        default='SVGA')
+    parser.add_argument('--fps', type=int, default=15)
+    parser.add_argument('--duration', type=float, default=0,
+                        help='Seconds after recording starts; 0 means until Ctrl+C.')
+    parser.add_argument('--output-dir', type=Path, default=Path('~/recordings'))
+    parser.add_argument('--enable-self-calibration', action='store_true',
+                        help='Opt in to the startup adjustment; skipped by default.')
+    parser.add_argument('--max-consecutive-errors', type=int, default=30)
+    parser.add_argument('--write-stall-timeout', type=float, default=15,
+                        help='Stop if the encoded-frame counter stalls this many seconds.')
+    if (args := parser.parse_args()).duration < 0:
+        parser.error('--duration must be nonnegative')
+    if args.fps <= 0 or args.max_consecutive_errors <= 0:
+        parser.error('--fps and --max-consecutive-errors must be positive')
+    if args.write_stall_timeout <= 0:
+        parser.error('--write-stall-timeout must be positive')
+    return args
+
+
+def main():
+    args = parse_args()
+    # Import here so --help also works on machines without the camera SDK.
+    import pyzed.sl as sl
+
+    stop_requested = False
+
+    def request_stop(signum, frame):
+        nonlocal stop_requested
+        stop_requested = True
+
+    signal.signal(signal.SIGINT, request_stop)
+    signal.signal(signal.SIGTERM, request_stop)
+
+    output_dir = args.output_dir.expanduser().resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
+    filename = output_dir / f'recording_{datetime.now():%Y%m%d_%H%M%S_%f}.svo2'
+    zed = sl.Camera()
+    recording_started = False
+    failed = False
+    successful_grabs = 0
+    warning_grabs = 0
+    consecutive_errors = 0
 
     try:
         init = sl.InitParameters()
@@ -115,4 +176,3 @@
 
 if __name__ == '__main__':
     sys.exit(main())
-
